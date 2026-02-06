@@ -44,8 +44,7 @@ We successfully implemented a standalone differentiable auction loop in a Jupyte
 We simulated a 2-agent auction ($N=2$) with Uniform valuations. The theoretical prediction is that agents should learn to bid half their valuation ($w = 0.5$).
 
 **Visual Evidence:**
-![Convergence Results](path/to/your_screenshot.png)
-*(Note: Replace this path with your actual uploaded image file)*
+![Convergence Results](<img width="1184" height="482" alt="Screenshot 2026-02-06 at 1 26 54 AM" src="https://github.com/user-attachments/assets/c32bb074-da67-440d-9167-117b03face15" />)
 
 **Observations:**
 1.  **Fast Adaptation:** As shown in the left plot, both agents started with a naive high bid strategy ($w \approx 0.9$) and rapidly descended towards the equilibrium.
