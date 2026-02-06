@@ -30,9 +30,11 @@ Where $m_i$ is the highest competing bid and $\beta$ is a temperature parameter 
 * **Algorithm:** Online Gradient Ascent.
 * **Policy:** We parameterize the bidding strategy as a linear function $b_i = w_i \cdot v_i$, where $w_i$ is a learnable scalar.
 * **Loss Function:** Negative Expected Utility.
-    $$
-    \mathcal{L}(\theta) = - \mathbb{E}[(v_i - b_i) \cdot P(\text{win})]
-    $$
+
+$$
+\mathcal{L}(\theta) = - \mathbb{E}[(v_i - b_i) \cdot P(\text{win})]
+$$
+
 * **Implementation:** PyTorch with `torch.sigmoid` for the relaxation and `SGD/Adam` for the parameter updates.
 
 ## 3. Initial Results
@@ -56,5 +58,5 @@ With the core optimization loop validated, the next phase focuses on scaling com
 
 1.  **PettingZoo Integration:** Port the standalone logic into a formal `PettingZoo` environment to support standard MARL libraries.
 2.  **Mechanism Comparison:** Implement Second-Price and VCG mechanisms to compare convergence rates (Phase 2 of proposal).
-3.  **Neural Network Policies:** Replace the simple linear parameter $w$ with a Neural Network ($\pi_\theta(v)$) to allow for learning non-linear strategies in asymmetric valuation environments.
+3.  **Neural Network Policies:** Replace the simple linear parameter $w$ with a Neural Network ( $\pi_\theta(v)$ ) to allow for learning non-linear strategies in asymmetric valuation environments.
 4.  **Temperature Scheduling:** Implement an annealing schedule for the parameter $\beta$ to reduce the "over-shading" bias as training progresses.
