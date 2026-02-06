@@ -1,4 +1,4 @@
-# carbon-auction-marl
+# marl-first-price-auctions
 
 # Auction Mechanism Design for Carbon Permits Under Information Asymmetry
 
