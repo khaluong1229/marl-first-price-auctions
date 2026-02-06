@@ -1,84 +1,123 @@
 # marl-first-price-auctions
 
-# Auction Mechanism Design for Carbon Permits Under Information Asymmetry
+## Abstract
+We are studying the convergence properties of coupled optimization algorithms in multi-agent first-price auctions. Building on Han et al.'s (2020) single-agent online learning framework, we will extend their gradient-based bidding algorithm to settings where multiple agents simultaneously optimize their bidding strategies. This creates a system of coupled optimizers where each agent's optimization problem depends on others' evolving strategies, a form of distributed game-theoretic optimization. We will implement the acution environment as a PettingZoo-compatible MARL benchmark, reproducing the paper's single-agent results, and empirically analyze convergence to Nash equilibrium under different auction mechanisms and optimization algorithms.
 
-## Executive Summary
-Carbon permit auctions are the backbone of emissions trading systems like the EU ETS, which generates over €40 billion annually. A debate that appears in environmental economics is determining which auction format best allocates these permits when firms have private information about their costs. While the EU currently uses Uniform-Price auctions, economic theory suggests this format may suffer from demand reduction, where large firms intentionally underbid on permits to artificially lower the market-clearing price.
+## Background and Motivation
 
-This project utilizes Multi-Agent Reinforcement Learning (MARL) to simulate and compare three different auction mechanisms: Uniform-Price, Discriminatory (Pay-as-Bid), and Vickrey-Clarke-Groves (VCG). By modeling firms as learning agents that submit two-tier demand schedules, we can empirically test whether the strategic inefficiences predicted by theory actually occure in a dynamic market enviornment.
+### Problem Context
+First-price auctions are common in many areas, from online advertising to procurement. Unlike second-price auctions where truthful bidding is optimal, first-price auctions require strategic bidding where agents must balance between bidding high enough to win and bidding low enough to maximize surplus. This creates a non-trivial optimization problem for each bidder, especially when valuations vary over time, competitors' strategies are unknown, and the environment is non-stationary.
 
-## Theoretical Background
+### Single-Agent Learning
+Han et al. (2020) developed a minimax-optimal algorithm for learning to bid in adversarial first-price auctions, achieving O(√T) regret. Their approach uses online gradient ascent with expert chaining, Lipschitz constraints on bidding policies, and no distributional assumptions about compeitors. However, their work assumes a single learning agent competing against fixed or adversarial opponents.
 
-### The Economics of Carbon Markets
-In a "Cap-and-Trade" system, regulators set a strict limit (Cap) on total emissions and issue permits corresponding to that limit. Firms must hold a permit for every ton of CO2 they emit. This creates a market: firms that can reduce emissions cheaply will do so and sell their permits, while firms with high reduction costs will buy permits.
+### The Multi-Agent Gap
+Real-world auction platforms feature multiple adaptive bidders, each running optimization algorithms. This creates a different problem where each agent's optimization objective depends on others' current strategies, the optimization landscape is non-stationary for all agents, and standard convergence guarantees may not hold.
 
-The crucial decision for regulators is how to distribute these permits initially. Modern systems favor auctions over giving permits away for free (grandfathering) to avoid windfall profits for polluters and to generate government revenue for climate initiatives.
+Key Question: When all agents optimize simultaneously using gradient-based methods, do they converge? To what equilibrium? How do different auction mechanisms affect convergence dynamics?
 
-### The Three Auction Mechanisms
-We compare three distinct formats for selling these permits:
-* Uniform-Price Auction:
-  * How it works: Everyone submits bids. The auctioneer ranks them highest to lowest and accepts bids until the supply is gone. The price for everyone is set by the lowest winning bid (the clearing price).
-  * The flaw (demand reduction): Because the price is set by the marginal (last) bid, large bidders have an incentive to bid truthfully on their "must-have" permits but bid artificially low on their extra permits. If they are successful, this low bid sets the price for all the permits they won, saving them massive amounts of money.
-* Discriminatory Auction:
-  * How it works: Winners pay exactly what they bid. If you bid $80, you pay $80, even if the market clearing price was $40.
-  * The flaw (demand reduction): There is no incentive for "demand reduction" because lowering one bid doesn't change the price you pay for other bids. However, firms face the "Winner's Curse"—the fear of overpaying—which leads everyone to shade their bids downwards.
-* Vickrey-Clarke-Groves (VCG) Auction:
-  * How it works: This is a theoretical ideal where winners pay an amount equal to the "harm" their participation caused to other bidders (the social externality).
-  * The flaw (demand reduction): In theory, the optimal strategy in a VCG auction is to bid your true value exactly. It guarantees 100% efficiency but is complex and rarely used in the real world.
+## Problem Formulation
 
-### Why Two-Tier Bids?
-Firms have a decreasing marginal value for permits. The first permits are critical and without them, a factory might have to shut down. A firm is willing to pay a very high price for these. The later permits cover marginal production. If the price is too high, the firm can just cut back production slightly, so these are less valuable.
+### Single-Agent Optimization Problem
+Each bidder i at time t solves:
 
-To capture this, our model allows agents to submit a Two-Tier Demand Schedule. Agents will set a high price for their critical needs and a lower price for their optional needs. This structure is crucial for observing the Demand Reduction strategy.
+$$\max_{b_{i,t} \in [0,1]} \mathbb{E}[U_{i,t}(b_{i,t})] = \mathbb{E}[v_{i,t} \cdot \mathbb{1}(b_{i,t} \geq m_{i,t}) - b_{i,t} \cdot \mathbb{1}(b_{i,t} \geq m_{i,t})]$$
 
-## Mathematical Formulation
+where:
+- $b_{i,t}$ = agent i's bid (decision variable)
+- $v_{i,t}$ = agent i's private valuation
+- $m_{i,t}$ = highest competing bid against agent i
+- $\mathbb{1}(\cdot)$ = indicator function for winning
 
-### Firm Characteristics
-We model $N$ heterogeneous firms. Each firm $i$ has a private Marginal Abatement Cost (MAC) coefficient, $c_i$, which determines how expensive it is for them to reduce pollution. This cost is private information, and the regulator does not know it.
+Optimization Method: Online gradient ascent on the cumulative utility
 
-The cost to reduce emissions by amount $a$ is quadratic: $$C_i(a) = \frac{c_i}{2}a^2$$ This implies a linear Marginal Abatement Cost curve: $MAC = c_i \cdot a$. As a firm reduces more emissions, it becomes increasingly expensive to reduce the next unit.
+Regret Criterion:
+$$R_T = \sum_{t=1}^T U^*_t - \sum_{t=1}^T U_t$$
 
-### Valuation of Permits
-The value of receiving a permit is equal to the abatement cost the firm avoids paying. Because costs are quadratic, the value of permits is decreasing. The value $v_i(k)$ of the $k$-th permit is: $$v_i(k) = c_i \cdot (e_i^0 - k + 1)$$ Where $e_i^0$ is the firm's baseline emissions.
+where $U^*_t$ is the utility of the best fixed Lipschitz bidding policy in hindsight.
 
-### Optimization Problem
-Each firm acts as an independent agent trying to maximize its own profit $\pi_i$: $$\pi_i = \text{Total Value of Permits Won} - \text{Payment to Regulator}$$ $$\pi_i = \sum_{k=1}^{x_i} v_i(k) - \text{Payment}_i$$ The Payment depends on the auction mechanism rules (Uniform, Discriminatory, or VCG).
+### Multi-Agent Coupled Optimization
+With N learning agents, the system becomes:
 
-## Methodology: MARL
+$$\text{For each } i \in \{1, \ldots, N\}: \quad \max_{\theta_i} \sum_{t=1}^T U_i(b_i(\theta_i; v_{i,t}), b_{-i}(\theta_{-i}; v_{-i,t}))$$
 
-### Learning Approach
-We model the auction as a partially observable Markov game. We use Independent Proximal Policy Optimization (IPPO), a standard Reinforcement Learning algorithm.
-* Decentralized Learning: Each firm has its own brain (neural network policy). They do not share information or coordinate training, mimicking the real world where firms are competitors.
-* Partial Observability: An agent knows its own costs and the history of market prices, but it cannot see the private costs or bids of its competitors.
+where:
+- $\theta_i$ = parameters of agent i's bidding policy
+- $b_i(\theta_i; v)$ = agent i's bid given valuation v
+- $b_{-i}$ = other agents' bids (which depend on their learning)
 
-### Action Space
-Unlike simple models where agents pick a single number, our agents output a multi-dimensional action representing their demand schedule:
-* $p^H$: The price for their high-value tier (critical permits).
-* $q^H$: The quantity of critical permits needed.
-* $p^L$: The price for their low-value tier (optional permits).
-* $q^L$: The quantity of optional permits needed.
+Key Challenge: Each agent's optimization problem is **coupled** through the auction outcome.
 
-The environment enforces a monotonicity constraint ($p^H \ge p^L$) to ensure the demand curve logically slopes downward.
+### Equilibrium as Fixed Point
 
-## Implementation Strategy
-The project is divided into four phases.
+A Nash equilibrium $\theta^* = (\theta^*_1, \ldots, \theta^*_N)$ satisfies:
+
+$$\theta^{*}_{i} \in \arg\max_{\theta_i} U_i(\theta_i, \theta^*_{-i}) \quad \forall i$$
+
+This is a fixed-point problem in the space of bidding strategies.
+
+Research Question: Do gradient-based learning dynamics converge to this fixed point?
+
+## Methodology
 
 ### Environment Development
-We will build a custom simulation environment that can switch between the three auction rules.
-* Objective: Validate that the "Market Clearing" logic works. For example, in a Uniform-Price auction, does shading the low-tier bid correctly lower the clearing price for the high-tier permits?
-* Deliverable: A suite of unit tests verifying the economic logic against theoretical examples.
+We will create a multi-agent first-price auction environment where $N$ agents bid simultaneously and that supports multiple mechanisms (1st price, 2nd price, VCG). Features include switchable auction mechanisms, configurable valuation distributions, and support for partial observability (win/loss only vs full feedback).
 
-### Single-Agent Training
-We will train a single learning agent against "dummy" opponents with fixed strategies.
-* Objective: Confirm that the agent can actually learn to make money. It should learn to bid truthful values when playing against non-strategic opponents.
-* Deliverable: Learning curves showing profit maximization.
+### Optimization Algorithms to Implement
+We will implement online gradient ascent, multiplicative weights updating, and policy gradients.
 
-### Multi-Agent Learning
-We will introduce 10 learning agents into the same market.
-* Objective: Observe emergent behavior. Do Uniform-Price agents learn to shade their bids more than Discriminatory agents? Does the market stabilize?
-* Deliverable: Trained policies for all 10 agents across all three mechanism types.
+### Multi-Agent Training Protocol
+Each agent computes a bid. The Auction determines winner and payments. Each agent updates independently.
 
-### Analysis and Metrics
-We will evaluate the trained markets using two primary metrics:
-* Allocative Efficiency: A ratio (0 to 1) measuring if the permits went to the firms who valued them most (High Efficiency) or if they were misallocated to low-value firms (Low Efficiency).
-* Demand Reduction Index (DRI): A novel metric calculating the difference between shading on the high tier vs. the low tier. A positive DRI indicates that firms are manipulating the market.
+### Convergence Analysis Methods
+* Strategy Distance Metrics: $$d_t = \frac{1}{N} \sum_{i=1}^N \|\theta_{i,t} - \theta_{i,t-1}\|_2$$
+* Nash Equilibrium Distance:
+  * Compute best-response for each agent given others' current strategies
+  * Measure: $\epsilon$-Nash deviation = $\max_i [U_i(BR_i, \theta_{-i}) - U_i(\theta_i, \theta_{-i})]$
+* Social Welfare Metrics:
+  * Total surplus: $\sum_{i=1}^N U_i$
+  * Auction revenue
+  * Efficiency: Ratio of value to winner vs maximum possible value
+* Lyapunov Function (if possible):
+  * Design function $V(\theta)$ that decreases along optimization trajectory
+  * Proves convergence if $V$ is bounded below
+ 
+## Experimental Design
+
+### Reproduction Strategy
+Goal: Validate our implementation against Han et al.'s single-agent results
+
+Setup:
+* 1 learning agent vs. fixed bidding strategies
+* Adversarial competitor bids
+* Measure regret: $R_T = O(\sqrt{T})$?
+
+**Success Criterion:** Match reported regret bounds from Han et al.
+
+### Multi-Agent Convergence
+Goal: Study convergence when all agents learn
+
+Variables:
+* Number of agents: N ∈ {2, 3, 5, 10}
+* Optimization algorithms: {Gradient Ascent, Multiplicative Weights, Policy Gradient}
+* Learning rates: {0.01, 0.1, 0.5}
+* Valuation distributions: {Uniform[0,1], Beta(2,2), Asymmetric}
+
+### Mechanism Comparison
+* First-price auction
+* Second-price auction (Vickrey)
+* VCG mechanism
+
+### Sensitivity Analysis
+Variables to test for sensitivity:
+* Learning rate schedules: constant vs. $O(1/\sqrt{t})$ decay
+* Exploration noise
+* Information feedback: full vs. binary (win/loss only)
+
+## Research Questions
+1. Convergence: Do coupled gradient-based optimizers converge in multi-agent auctions? Under what conditions (learning rates, agents, mechanisms)?
+2. Convergence rate: How fast? Compare to single0agent rate. Does adding agents slow convergence?
+3. Equilibrium quality: What do they converge to? Nash equilibrium? Socially optimal? revenue-maximizing for auctioneer?
+4. Algorithm comparison: Which optimization method works best? Gradient ascent vs multiplicative weights vs deep RL. Trade-offs of speed vs equilibrium quality.
+5. Mechanism design: Which auction mechanism leads to best learning dynamics? VCG vs first-price vs second-price. Relationship to incentive compatibility.
+
